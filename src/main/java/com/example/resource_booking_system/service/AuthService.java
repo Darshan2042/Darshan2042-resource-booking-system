@@ -5,13 +5,15 @@ import com.example.resource_booking_system.dto.auth.LoginResponse;
 import com.example.resource_booking_system.dto.auth.RegisterRequest;
 import com.example.resource_booking_system.entity.User;
 import com.example.resource_booking_system.enums.Role;
+import com.example.resource_booking_system.exception.BadRequestException;
 import com.example.resource_booking_system.exception.UserNotFoundException;
 import com.example.resource_booking_system.repository.UserRepository;
 import com.example.resource_booking_system.security.JwtService;
-import com.example.resource_booking_system.exception.BadRequestException;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,18 +24,26 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final UserDetailsService userDetailsService;
 
     public AuthService(
-            AuthenticationManager authenticationManager,
             UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            AuthenticationManager authenticationManager,
             JwtService jwtService,
-            PasswordEncoder passwordEncoder) {
+            UserDetailsService userDetailsService) {
 
-        this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
-        this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
     }
+
+
+    // ==========================================
+    // LOGIN
+    // ==========================================
 
     public LoginResponse login(LoginRequest request) {
 
@@ -44,22 +54,23 @@ public class AuthService {
                 )
         );
 
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() ->
-                        new UserNotFoundException("User not found")
-                );
-
-        String token = jwtService.generateToken(
-                new org.springframework.security.core.userdetails.User(
-                        user.getUsername(),
-                        user.getPassword(),
-                        java.util.List.of(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                                        "ROLE_" + user.getRole().name()
-                                )
-                        )
+        User user = userRepository.findByUsername(
+                request.getUsername()
+        ).orElseThrow(() ->
+                new UserNotFoundException(
+                        "User not found"
                 )
         );
+
+        // Load Spring Security user details through
+        // the application's UserDetailsService.
+        UserDetails userDetails =
+                userDetailsService.loadUserByUsername(
+                        request.getUsername()
+                );
+
+        String token =
+                jwtService.generateToken(userDetails);
 
         return new LoginResponse(
                 token,
@@ -68,22 +79,39 @@ public class AuthService {
         );
     }
 
+
+    // ==========================================
+    // REGISTER
+    // ==========================================
+
     public void register(RegisterRequest request) {
 
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new BadRequestException("Username already exists");
+        if (userRepository.existsByUsername(
+                request.getUsername())) {
+
+            throw new BadRequestException(
+                    "Username already exists"
+            );
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email already exists");
+        if (userRepository.existsByEmail(
+                request.getEmail())) {
+
+            throw new BadRequestException(
+                    "Email already exists"
+            );
         }
 
         User user = new User();
 
         user.setUsername(request.getUsername());
+
         user.setEmail(request.getEmail());
+
         user.setPassword(
-                passwordEncoder.encode(request.getPassword())
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
         );
 
         // Every registered account is a USER.

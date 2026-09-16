@@ -12,6 +12,7 @@ import com.example.resource_booking_system.repository.ReservationRepository;
 import com.example.resource_booking_system.repository.ReservationSpecification;
 import com.example.resource_booking_system.repository.ResourceRepository;
 import com.example.resource_booking_system.repository.UserRepository;
+import com.example.resource_booking_system.enums.Role;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +20,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
@@ -76,6 +76,18 @@ public class ReservationService {
                 request.getEndTime()
         );
 
+        // Check whether the resource is already booked
+        if (reservationRepository.existsOverlappingReservation(
+                resource.getId(),
+                request.getStartTime(),
+                request.getEndTime(),
+                ReservationStatus.CANCELLED)) {
+
+            throw new BadRequestException(
+                    "Resource is already reserved for the selected time slot"
+            );
+        }
+
         BigDecimal totalPrice = calculateTotalPrice(
                 resource,
                 request.getStartTime(),
@@ -86,10 +98,13 @@ public class ReservationService {
 
         reservation.setUser(user);
         reservation.setResource(resource);
-        reservation.setStartTime(request.getStartTime());
-        reservation.setEndTime(request.getEndTime());
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setTotalPrice(totalPrice);
+
+        reservation.updateReservationDetails(
+                request.getStartTime(),
+                request.getEndTime(),
+                ReservationStatus.PENDING,
+                totalPrice
+        );
 
         Reservation savedReservation =
                 reservationRepository.save(reservation);
@@ -117,29 +132,20 @@ public class ReservationService {
                 );
 
         Specification<Reservation> specification =
+                buildSpecification(
+                        status,
+                        minPrice,
+                        maxPrice
+                );
+
+        // USER can see only their own reservations
+        specification = specification.and(
                 (root, query, criteriaBuilder) ->
                         criteriaBuilder.equal(
                                 root.get("user").get("id"),
                                 user.getId()
-                        );
-
-        if (status != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasStatus(status)
-            );
-        }
-
-        if (minPrice != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasMinPrice(minPrice)
-            );
-        }
-
-        if (maxPrice != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasMaxPrice(maxPrice)
-            );
-        }
+                        )
+        );
 
         return reservationRepository
                 .findAll(specification, pageable)
@@ -158,26 +164,11 @@ public class ReservationService {
             Pageable pageable) {
 
         Specification<Reservation> specification =
-                (root, query, criteriaBuilder) ->
-                        criteriaBuilder.conjunction();
-
-        if (status != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasStatus(status)
-            );
-        }
-
-        if (minPrice != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasMinPrice(minPrice)
-            );
-        }
-
-        if (maxPrice != null) {
-            specification = specification.and(
-                    ReservationSpecification.hasMaxPrice(maxPrice)
-            );
-        }
+                buildSpecification(
+                        status,
+                        minPrice,
+                        maxPrice
+                );
 
         return reservationRepository
                 .findAll(specification, pageable)
@@ -209,18 +200,12 @@ public class ReservationService {
                                 )
                         );
 
-        // USER can access only their own reservation
-        if (user.getRole().name().equals("USER")
-                && !reservation.getUser()
-                .getId()
-                .equals(user.getId())) {
+        validateReservationAccess(
+                user,
+                reservation,
+                "You are not allowed to access this reservation"
+        );
 
-            throw new ForbiddenException(
-                    "You are not allowed to access this reservation"
-            );
-        }
-
-        // ADMIN can access any reservation
         return mapToResponse(reservation);
     }
 
@@ -264,6 +249,20 @@ public class ReservationService {
                 request.getEndTime()
         );
 
+        // Check whether the updated reservation overlaps
+        // with another active reservation
+        if (reservationRepository.existsOverlappingReservationForUpdate(
+                resource.getId(),
+                reservationId,
+                request.getStartTime(),
+                request.getEndTime(),
+                ReservationStatus.CANCELLED)) {
+
+            throw new BadRequestException(
+                    "Resource is already reserved for the selected time slot"
+            );
+        }
+
         // Recalculate price using the updated resource/time
         BigDecimal totalPrice = calculateTotalPrice(
                 resource,
@@ -272,10 +271,13 @@ public class ReservationService {
         );
 
         reservation.setResource(resource);
-        reservation.setStartTime(request.getStartTime());
-        reservation.setEndTime(request.getEndTime());
-        reservation.setStatus(request.getStatus());
-        reservation.setTotalPrice(totalPrice);
+
+        reservation.updateReservationDetails(
+                request.getStartTime(),
+                request.getEndTime(),
+                request.getStatus(),
+                totalPrice
+        );
 
         Reservation updatedReservation =
                 reservationRepository.save(reservation);
@@ -303,16 +305,11 @@ public class ReservationService {
                                 )
                         );
 
-        // USER can confirm only their own; ADMIN can confirm any
-        if (user.getRole().name().equals("USER")
-                && !reservation.getUser()
-                .getId()
-                .equals(user.getId())) {
-
-            throw new ForbiddenException(
-                    "You are not allowed to confirm this reservation"
-            );
-        }
+        validateReservationAccess(
+                user,
+                reservation,
+                "You are not allowed to confirm this reservation"
+        );
 
         if (reservation.getStatus()
                 == ReservationStatus.CANCELLED) {
@@ -330,9 +327,7 @@ public class ReservationService {
             );
         }
 
-        reservation.setStatus(
-                ReservationStatus.CONFIRMED
-        );
+        reservation.confirm();
 
         Reservation updatedReservation =
                 reservationRepository.save(reservation);
@@ -365,18 +360,12 @@ public class ReservationService {
                                 )
                         );
 
-        // USER can cancel only their own reservation
-        if (user.getRole().name().equals("USER")
-                && !reservation.getUser()
-                .getId()
-                .equals(user.getId())) {
+        validateReservationAccess(
+                user,
+                reservation,
+                "You are not allowed to cancel this reservation"
+        );
 
-            throw new ForbiddenException(
-                    "You are not allowed to cancel this reservation"
-            );
-        }
-
-        // Cannot cancel already cancelled reservation
         if (reservation.getStatus()
                 == ReservationStatus.CANCELLED) {
 
@@ -385,9 +374,7 @@ public class ReservationService {
             );
         }
 
-        reservation.setStatus(
-                ReservationStatus.CANCELLED
-        );
+        reservation.cancel();
 
         Reservation updatedReservation =
                 reservationRepository.save(reservation);
@@ -446,20 +433,15 @@ public class ReservationService {
             LocalDateTime startTime,
             LocalDateTime endTime) {
 
-        long minutes = Duration.between(
-                startTime,
-                endTime
-        ).toMinutes();
+        long minutes = Duration.between(startTime, endTime).toMinutes();
 
-        BigDecimal hours = BigDecimal.valueOf(minutes)
-                .divide(
-                        BigDecimal.valueOf(60),
-                        2,
-                        RoundingMode.HALF_UP
-                );
+        // Billing is per hour.
+        // Any partial hour is charged as a complete hour.
+        long chargedHours = (minutes + 59) / 60;
 
-        return resource.getPricePerUnit()
-                .multiply(hours);
+        BigDecimal hours = BigDecimal.valueOf(chargedHours);
+
+        return resource.getPricePerUnit().multiply(hours);
     }
 
 
@@ -480,5 +462,71 @@ public class ReservationService {
                 reservation.getStatus(),
                 reservation.getTotalPrice()
         );
+    }
+
+    public boolean isOwner(Long reservationId, String username) {
+
+        return reservationRepository.findById(reservationId)
+                .map(reservation ->
+                        reservation.getUser()
+                                .getUsername()
+                                .equals(username)
+                )
+                .orElse(false);
+    }
+
+    private void validateReservationAccess(
+            User user,
+            Reservation reservation,
+            String errorMessage) {
+
+        // ADMIN can access any reservation
+        if (user.getRole() == Role.ADMIN) {
+            return;
+        }
+
+        // USER can access only their own reservation
+        if (user.getRole() == Role.USER
+                && reservation.getUser()
+                .getId()
+                .equals(user.getId())) {
+            return;
+        }
+
+        throw new ForbiddenException(errorMessage);
+    }
+
+    // ==========================================
+// BUILD RESERVATION SPECIFICATION
+// ==========================================
+
+    private Specification<Reservation> buildSpecification(
+            ReservationStatus status,
+            BigDecimal minPrice,
+            BigDecimal maxPrice) {
+
+        Specification<Reservation> specification =
+                (root, query, criteriaBuilder) ->
+                        criteriaBuilder.conjunction();
+
+        if (status != null) {
+            specification = specification.and(
+                    ReservationSpecification.hasStatus(status)
+            );
+        }
+
+        if (minPrice != null) {
+            specification = specification.and(
+                    ReservationSpecification.hasMinPrice(minPrice)
+            );
+        }
+
+        if (maxPrice != null) {
+            specification = specification.and(
+                    ReservationSpecification.hasMaxPrice(maxPrice)
+            );
+        }
+
+        return specification;
     }
 }

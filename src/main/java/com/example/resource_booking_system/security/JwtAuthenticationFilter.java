@@ -65,6 +65,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             try {
 
+                // Reload the user from the database on every request so that
+                // current roles and authorities are used for authorization.
+                // This prevents an old JWT role claim from granting access
+                // after the user's role has been changed.
                 UserDetails userDetails =
                         userDetailsService.loadUserByUsername(username);
 

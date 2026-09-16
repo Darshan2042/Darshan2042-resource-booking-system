@@ -51,7 +51,7 @@ A RESTful backend API for managing bookable resources (rooms, vehicles, equipmen
 - USER can cancel their own reservations
 - Global exception handling
 - Custom `401 Unauthorized` and `403 Forbidden` responses
-- 51 unit and integration tests focused on security and authorization
+- 62 unit and integration tests focused on security and authorization
 
 ---
 
@@ -92,7 +92,7 @@ Set the following environment variables before running the application.
 | `DB_USERNAME` | No | `root` | MySQL username |
 | `DB_PASSWORD` | Yes | — | MySQL password |
 | `JWT_SECRET` | Yes | — | Secret key used to sign JWTs |
-| `JWT_EXPIRATION` | No | `86400000` | Token validity in milliseconds (24 hours) |
+| `JWT_EXPIRATION` | No | `3600000` | Token validity in milliseconds (1 hour) |
 
 ### Windows PowerShell
 
@@ -152,16 +152,12 @@ http://localhost:8080
 
 ## Seed Users
 
-Two accounts are seeded automatically when the application starts.
+Seed users are available for local development and testing.
 
-Seeding is idempotent, so existing users are not overwritten.
+Seeding is disabled by default:
 
-| Role | Username | Password |
-|---|---|---|
-| ADMIN | `admin` | `admin123` |
-| USER | `user` | `user123` |
-
-> These credentials are intended for local development and testing. Change them for production use.
+```properties
+app.seed.enabled=false
 
 ---
 
@@ -437,31 +433,37 @@ An ADMIN can manage reservations according to their role permissions.
 
 ---
 
-# Reservation Price Calculation
+## Reservation Price Calculation
 
-Reservation price is calculated using:
+Reservation pricing is calculated on an hourly basis.
 
-```text
-Reservation Duration × Resource Price Per Unit
-```
+The resource price represents the price per hour.
 
-Duration is calculated using:
+Any partial hour is rounded up to the next full hour.
 
-```text
-startTime
-endTime
-```
+### Formula
 
-The calculated price is stored using `BigDecimal`.
+Charged Hours = Ceiling(Reservation Duration in Minutes / 60)
 
-### Example
+Total Price = Resource Price Per Hour × Charged Hours
 
-```text
-Resource price = 600 per hour
-Duration       = 2 hours
+### Examples
 
-Total price    = 1200
-```
+If the resource price is ₹600 per hour:
+
+| Reservation Duration | Charged Hours | Total Price |
+|---|---:|---:|
+| 30 minutes | 1 | ₹600 |
+| 59 minutes | 1 | ₹600 |
+| 60 minutes | 1 | ₹600 |
+| 61 minutes | 2 | ₹1200 |
+| 90 minutes | 2 | ₹1200 |
+| 120 minutes | 2 | ₹1200 |
+| 121 minutes | 3 | ₹1800 |
+
+The calculated total price is stored in the reservation's `totalPrice` field when the reservation is created.
+
+If an ADMIN updates the reservation's resource or time range, the total price is recalculated using the same hourly pricing rule.
 
 ---
 

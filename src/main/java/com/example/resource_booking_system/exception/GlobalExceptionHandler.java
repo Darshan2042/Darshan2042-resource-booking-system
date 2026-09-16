@@ -1,246 +1,158 @@
 package com.example.resource_booking_system.exception;
 
-import jakarta.servlet.http.HttpServletRequest;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import com.example.resource_booking_system.exception.UserNotFoundException;
-
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ==========================================
-    // 404 - RESOURCE NOT FOUND
-    // ==========================================
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleResourceNotFound(
-            ResourceNotFoundException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                exception.getMessage(),
-                request.getRequestURI()
-        );
-    }
+    private static final Logger logger =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 
-    // ==========================================
-    // 404 - RESERVATION NOT FOUND
-    // ==========================================
-
-    @ExceptionHandler(ReservationNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleReservationNotFound(
-            ReservationNotFoundException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                exception.getMessage(),
-                request.getRequestURI()
-        );
-    }
-
-
-    // ==========================================
-    // 400 - BAD REQUEST
-    // ==========================================
 
     @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(
-            BadRequestException exception,
-            HttpServletRequest request) {
+    public ResponseEntity<Map<String, String>> handleBadRequest(
+            BadRequestException exception) {
 
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                exception.getMessage(),
-                request.getRequestURI()
-        );
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", exception.getMessage()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(
+            ForbiddenException exception) {
 
-    // ==========================================
-    // 400 - VALIDATION ERROR
-    // ==========================================
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleResourceNotFound(
+            ResourceNotFoundException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ReservationNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleReservationNotFound(
+            ReservationNotFoundException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", exception.getMessage()));
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleUserNotFound(
+            UserNotFoundException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", exception.getMessage()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(
-            MethodArgumentNotValidException exception,
-            HttpServletRequest request) {
+    public ResponseEntity<Map<String, String>> handleValidation(
+            MethodArgumentNotValidException exception) {
 
-        Map<String, String> validationErrors = new HashMap<>();
+        Map<String, String> errors = new HashMap<>();
 
         exception.getBindingResult()
                 .getFieldErrors()
                 .forEach(error ->
-                        validationErrors.put(
+                        errors.put(
                                 error.getField(),
                                 error.getDefaultMessage()
                         )
                 );
 
-        Map<String, Object> error = new HashMap<>();
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errors);
+    }
 
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", 400);
-        error.put("error", "Bad Request");
-        error.put("message", "Validation failed");
-        error.put("path", request.getRequestURI());
-        error.put("details", validationErrors);
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleMalformedRequest(
+            HttpMessageNotReadableException exception) {
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(error);
+                .body(Map.of(
+                        "error",
+                        "Malformed request body or invalid field value"
+                ));
     }
-
-
-    // ==========================================
-    // 401 - BAD CREDENTIALS
-    // ==========================================
-
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<Map<String, Object>> handleBadCredentials(
-            BadCredentialsException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.UNAUTHORIZED,
-                "Invalid username or password",
-                request.getRequestURI()
-        );
-    }
-
-
-    // ==========================================
-    // 403 - ACCESS DENIED
-    // ==========================================
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(
-            AccessDeniedException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.FORBIDDEN,
-                "You do not have permission to access this resource",
-                request.getRequestURI()
-        );
-    }
-
-
-    // ==========================================
-    // COMMON ERROR RESPONSE
-    // ==========================================
-
-    private ResponseEntity<Map<String, Object>> buildErrorResponse(
-            HttpStatus status,
-            String message,
-            String path) {
-
-        Map<String, Object> error = new HashMap<>();
-
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", status.value());
-        error.put("error", status.getReasonPhrase());
-        error.put("message", message);
-        error.put("path", path);
-
-        return ResponseEntity
-                .status(status)
-                .body(error);
-    }
-
-
-    @ExceptionHandler(ForbiddenException.class)
-    public ResponseEntity<Map<String, Object>> handleForbidden(
-            ForbiddenException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.FORBIDDEN,
-                exception.getMessage(),
-                request.getRequestURI()
-        );
-    }
-
-    // ==========================================
-    // 404 - USER NOT FOUND
-    // ==========================================
-
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleUserNotFound(
-            UserNotFoundException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                exception.getMessage(),
-                request.getRequestURI()
-        );
-    }
-
-
-    // ==========================================
-    // 400 - MALFORMED JSON / INVALID ENUM
-    // ==========================================
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> handleUnreadableMessage(
-            HttpMessageNotReadableException exception,
-            HttpServletRequest request) {
-
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Malformed request body or invalid field value",
-                request.getRequestURI()
-        );
-    }
-
-
-    // ==========================================
-    // 400 - INVALID PARAMETER TYPE
-    // ==========================================
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
-            MethodArgumentTypeMismatchException exception,
-            HttpServletRequest request) {
+    public ResponseEntity<Map<String, String>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception) {
 
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Invalid value for parameter: " + exception.getName(),
-                request.getRequestURI()
-        );
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "error",
+                        "Invalid value for parameter: "
+                                + exception.getName()
+                ));
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAuthorizationDenied(
+            AuthorizationDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                        "error",
+                        "Access denied"
+                ));
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentials(
+            BadCredentialsException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                        "error",
+                        "Invalid username or password"
+                ));
     }
 
 
-    // ==========================================
-    // 500 - CATCH ALL
-    // ==========================================
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(
-            Exception exception,
-            HttpServletRequest request) {
+    public ResponseEntity<Map<String, String>> handleUnexpectedException(
+            Exception exception) {
 
-        return buildErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred",
-                request.getRequestURI()
+        logger.error(
+                "Unexpected exception occurred while processing request",
+                exception
         );
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                        "error",
+                        "An unexpected error occurred"
+                ));
     }
 }

@@ -7,10 +7,18 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 
-public class ReservationSpecification {
+public final class ReservationSpecification {
+
+    private ReservationSpecification() {
+        // Utility class
+    }
 
     public static Specification<Reservation> hasStatus(
             ReservationStatus status) {
+
+        if (status == null) {
+            return null;
+        }
 
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.equal(
@@ -22,6 +30,10 @@ public class ReservationSpecification {
     public static Specification<Reservation> hasMinPrice(
             BigDecimal minPrice) {
 
+        if (minPrice == null) {
+            return null;
+        }
+
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.greaterThanOrEqualTo(
                         root.get("totalPrice"),
@@ -31,6 +43,10 @@ public class ReservationSpecification {
 
     public static Specification<Reservation> hasMaxPrice(
             BigDecimal maxPrice) {
+
+        if (maxPrice == null) {
+            return null;
+        }
 
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.lessThanOrEqualTo(

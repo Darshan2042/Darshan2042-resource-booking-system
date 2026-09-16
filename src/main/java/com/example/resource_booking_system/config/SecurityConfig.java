@@ -1,6 +1,7 @@
 package com.example.resource_booking_system.config;
 
 import com.example.resource_booking_system.security.JwtAuthenticationFilter;
+import com.example.resource_booking_system.security.RateLimitFilter;
 import com.example.resource_booking_system.security.RestAccessDeniedHandler;
 import com.example.resource_booking_system.security.RestAuthenticationEntryPoint;
 
@@ -26,14 +27,18 @@ public class SecurityConfig {
 
     private final RestAccessDeniedHandler accessDeniedHandler;
 
+    private final RateLimitFilter rateLimitFilter;
+
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
-            RestAccessDeniedHandler accessDeniedHandler) {
+            RestAccessDeniedHandler accessDeniedHandler,
+            RateLimitFilter rateLimitFilter) {
 
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.rateLimitFilter = rateLimitFilter;
     }
 
     @Bean
@@ -45,7 +50,9 @@ public class SecurityConfig {
                 // ==========================================
                 // CSRF
                 // ==========================================
-
+                // CSRF is disabled because this application is a
+                // stateless REST API authenticated using JWT tokens
+                // rather than browser-managed sessions.
                 .csrf(csrf -> csrf.disable())
 
                 // ==========================================
@@ -65,7 +72,10 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        .requestMatchers(
+                                "/auth/login",
+                                "/auth/register"
+                        ).permitAll()
 
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -89,6 +99,15 @@ public class SecurityConfig {
                         .accessDeniedHandler(
                                 accessDeniedHandler
                         )
+                )
+
+                // ==========================================
+                // RATE LIMIT FILTER
+                // ==========================================
+
+                .addFilterBefore(
+                        rateLimitFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 )
 
                 // ==========================================

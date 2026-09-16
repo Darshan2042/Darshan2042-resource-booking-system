@@ -1,38 +1,30 @@
-package com.example.resource_booking_system.config;
+package com.example.resource_booking_system;
 
 import com.example.resource_booking_system.entity.User;
 import com.example.resource_booking_system.enums.Role;
 import com.example.resource_booking_system.repository.UserRepository;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-@Configuration
-public class DataSeeder {
-
-    @Value("${app.seed.enabled:false}")
-    private boolean seedEnabled;
+@TestConfiguration
+public class TestDataConfig {
 
     @Bean
-    CommandLineRunner seedUsers(
+    CommandLineRunner testUsers(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder) {
 
         return args -> {
-
-            if (!seedEnabled) {
-                return;
-            }
 
             if (userRepository.findByUsername("admin").isEmpty()) {
 
                 User admin = new User();
 
                 admin.setUsername("admin");
-                admin.setEmail("admin@example.com");
+                admin.setEmail("admin@test.com");
                 admin.setPassword(
                         passwordEncoder.encode("admin123")
                 );
@@ -46,7 +38,7 @@ public class DataSeeder {
                 User user = new User();
 
                 user.setUsername("user");
-                user.setEmail("user@example.com");
+                user.setEmail("user@test.com");
                 user.setPassword(
                         passwordEncoder.encode("user123")
                 );

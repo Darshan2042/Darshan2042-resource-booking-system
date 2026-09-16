@@ -108,7 +108,7 @@ public class ReservationController {
                     description = "Authentication required"
             )
     })
-    public ResponseEntity<Page<ReservationResponse>> getMyReservations(
+    public Page<ReservationResponse> getMyReservations(
             Authentication authentication,
 
             @RequestParam(required = false)
@@ -124,16 +124,13 @@ public class ReservationController {
 
         String username = authentication.getName();
 
-        Page<ReservationResponse> response =
-                reservationService.getUserReservations(
-                        username,
-                        status,
-                        minPrice,
-                        maxPrice,
-                        pageable
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.getUserReservations(
+                username,
+                status,
+                minPrice,
+                maxPrice,
+                pageable
+        );
     }
 
 
@@ -158,7 +155,7 @@ public class ReservationController {
                     description = "Access denied. ADMIN role required."
             )
     })
-    public ResponseEntity<Page<ReservationResponse>> getAllReservations(
+    public Page<ReservationResponse> getAllReservations(
 
             @RequestParam(required = false)
             ReservationStatus status,
@@ -171,15 +168,12 @@ public class ReservationController {
 
             @ParameterObject Pageable pageable) {
 
-        Page<ReservationResponse> response =
-                reservationService.getAllReservations(
-                        status,
-                        minPrice,
-                        maxPrice,
-                        pageable
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.getAllReservations(
+                status,
+                minPrice,
+                maxPrice,
+                pageable
+        );
     }
 
 
@@ -189,6 +183,9 @@ public class ReservationController {
     // ==========================================
 
     @GetMapping("/{id}")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @reservationService.isOwner(#id, authentication.name)"
+    )
     @Operation(
             summary = "Get reservation by ID",
             description = "Returns a reservation accessible to the authenticated user"
@@ -207,19 +204,16 @@ public class ReservationController {
                     description = "Reservation not found"
             )
     })
-    public ResponseEntity<ReservationResponse> getReservationById(
+    public ReservationResponse getReservationById(
             @PathVariable Long id,
             Authentication authentication) {
 
         String username = authentication.getName();
 
-        ReservationResponse response =
-                reservationService.getReservationById(
-                        id,
-                        username
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.getReservationById(
+                id,
+                username
+        );
     }
 
 
@@ -252,17 +246,14 @@ public class ReservationController {
                     description = "Reservation not found"
             )
     })
-    public ResponseEntity<ReservationResponse> updateReservation(
+    public ReservationResponse updateReservation(
             @PathVariable Long id,
             @Valid @RequestBody ReservationUpdateRequest request) {
 
-        ReservationResponse response =
-                reservationService.updateReservation(
-                        id,
-                        request
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.updateReservation(
+                id,
+                request
+        );
     }
 
 
@@ -290,19 +281,16 @@ public class ReservationController {
                     description = "Reservation not found"
             )
     })
-    public ResponseEntity<ReservationResponse> cancelReservation(
+    public ReservationResponse cancelReservation(
             @PathVariable Long id,
             Authentication authentication) {
 
         String username = authentication.getName();
 
-        ReservationResponse response =
-                reservationService.cancelReservation(
-                        id,
-                        username
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.cancelReservation(
+                id,
+                username
+        );
     }
 
 
@@ -330,19 +318,16 @@ public class ReservationController {
                     description = "Reservation not found"
             )
     })
-    public ResponseEntity<ReservationResponse> confirmReservation(
+    public ReservationResponse confirmReservation(
             @PathVariable Long id,
             Authentication authentication) {
 
         String username = authentication.getName();
 
-        ReservationResponse response =
-                reservationService.confirmReservation(
-                        id,
-                        username
-                );
-
-        return ResponseEntity.ok(response);
+        return reservationService.confirmReservation(
+                id,
+                username
+        );
     }
 
 
