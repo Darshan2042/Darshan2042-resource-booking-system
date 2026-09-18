@@ -1,10 +1,11 @@
-package com.example.resource_booking_system.service;
+package com.example.resource_booking_system;
 
 import com.example.resource_booking_system.dto.auth.RegisterRequest;
 import com.example.resource_booking_system.entity.User;
 import com.example.resource_booking_system.enums.Role;
 import com.example.resource_booking_system.repository.UserRepository;
 
+import com.example.resource_booking_system.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

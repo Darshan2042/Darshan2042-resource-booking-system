@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+
+
+//It is used for the 403 Error
 @Component
 public class RestAccessDeniedHandler
         implements AccessDeniedHandler {

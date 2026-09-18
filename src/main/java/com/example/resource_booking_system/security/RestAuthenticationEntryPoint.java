@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.time.LocalDateTime;
 
+// It is used for the 401 error
 @Component
 public class RestAuthenticationEntryPoint
         implements AuthenticationEntryPoint {

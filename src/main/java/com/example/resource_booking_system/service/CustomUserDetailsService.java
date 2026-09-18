@@ -3,6 +3,7 @@ package com.example.resource_booking_system.service;
 import com.example.resource_booking_system.entity.User;
 import com.example.resource_booking_system.repository.UserRepository;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -17,6 +18,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         this.userRepository = userRepository;
     }
 
+    @NullMarked
     @Override
     public UserDetails loadUserByUsername(String username)
             throws UsernameNotFoundException {
